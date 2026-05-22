@@ -18,5 +18,9 @@ Load sensor inaccuracy can be caused by rapid changes in temperature, inconsiste
 
 ## RFID 
 
-RFID has many wires, and you need to ensure that the wires are plugged into the correct place or all the way. 
+RFID has many wires, and you need to ensure that the wires are plugged into the correct place and all the way. 
+
+## Motion Sensor
+
+The motion sensor usually is pretty accurate, but if it is
 
