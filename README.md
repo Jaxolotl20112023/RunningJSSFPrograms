@@ -10,7 +10,7 @@ Inside the MotionDetection file, it'll first check for motion using the motion d
 
 Load sensor inaccuracy can be caused by rapid changes in temperature, inconsistent power usage, and the wrong orientation of the amplifier. 
 
-  1. Ensure that the load cell is getting consistent power through the 3.3V port. To do this, use a multimeter and put the positive into the 3.3V port and the neutral in the ground. If you can't, use this command in the terminal: 
+  1. Ensure that the load cell is getting consistent power through the 3.3V port. To do this, use a multimeter and put the positive into the 3.3V port and the neutral in the ground. If you can't, use this command in the terminal: vcgencmd get_throttled. Anything not 0x0 means there are power fluctuations in the pi.
   2. Ensure that the temperature is not changing too rapidly
   3. If the amplifier is not flat and vertical, then the readings are more susceptible to error
   4. If it still doesn't work, ensure that the wires are plugged in all the way.
@@ -28,4 +28,4 @@ The motion sensor is usually pretty accurate, but if it is not working, then it 
 
 The servo is also prone to changes in the power, meaning that the power must be consistent (usually want to have a resistor to regulate and keep the power consistent). This can cause drifting or jittering of the servo. 
 
-  1. To check if put the positive into the 5v port and the neutral into the ground. 
+  1. To check it put the positive into the 5v port and the neutral into the ground. 
