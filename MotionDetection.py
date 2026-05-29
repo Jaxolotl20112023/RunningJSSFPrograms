@@ -37,7 +37,7 @@ print("start_time: ", start_time)
 
 # prepare the saving of the data
 csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', mode='a', compression='gzip')
+csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
 data_path = "/home/alalajssf123/Desktop/RunningJSSFPrograms/ALALA_FEEDER_DATA.csv.gz"
 remote_path = "GoogleDrive:ALALA_DATA"
 csv_df_len = len(csv_df)
@@ -163,7 +163,7 @@ def save() :
     global csv_df_len
     global csv_df
     
-    csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', mode='a', compression='gzip')
+    csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
     print(csv_df_len)
     
     if len(csv_df) >= csv_df_len+20 :
