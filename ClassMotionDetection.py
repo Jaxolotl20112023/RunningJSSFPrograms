@@ -12,22 +12,140 @@ from gpiozero import Servo
 from rclone_python import rclone
 import os 
 
-# Servo set up
-servo = Servo(18)
+class load_cell() : 
 
-# RFID set up
-GPIO.setmode(GPIO.BCM)                 # set GPIO pin mode to BCM numbering
-reader = SimpleMFRC522()
+    def __init__(self,dout,sck,ratio,file_name) : 
+        self.dout = dout
+        self.sck = sck
+        self.ratio = ratio
+        self.file_name = file_name
+        self.hx = HX711(dout_pin=self.dout, pd_sck_pin=self.sck) 
+        self.hx.zero() 
+        self.hx.set_scale_ratio(ratio) 
+
+        self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
+        self.csv_df.to_csv(f'{file_name}_{datetime.now().day}.csv.gz', compression='gzip')
+        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().day}.csv.gz"
+
+    def activate(self) : 
+        GPIO.output(self.dout,GPIO.HIGH)
+        GPIO.output(self.sck, GPIO.HIGH) 
+        GPIO.cleanup()
+
+        hx = self.hx
+        file_name = self.file_name
+
+        print(hx)
+        
+        prevWeight = 0
+        weight = 0
+        
+        for i in range (4) :
+            prevWeight = weight
+            weight += hx.get_weight_mean()
+            
+            append(datetime.now(),rfid1.id, weight-prevWeight, "N/A")
+            
+            print(weight-prevWeight,'grams')
+                
+        averageWeight = weight/4
+        
+        print("Average Weight: ", averageWeight)
+
+        append(self.csv_df,datetime.now(),rfid1.id, "N/A", averageWeight)
+        save()
+        MotionDetectionMain()
+
+    def deactivate(self) : 
+        GPIO.output(self.dout,GPIO.LOW)
+        GPIO.output(self.sck, GPIO.LOW) 
+        GPIO.cleanup()
+
+    def change_files(self) : 
+
+        os.remove(self.data_path)
+
+        self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
+        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().day}.csv.gz', compression='gzip')
+        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{self.file_name}_{datetime.now().day}.csv.gz"
+
+    def convert_to_csv(self) : 
+        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().day}.csv.gz', compression='gzip')
+        
+        
+class rfid() : 
+
+    def __init__(self) : 
+        GPIO.setmode(GPIO.BCM)                
+        self.reader = SimpleMFRC522()
+        self.id = None
+
+    def getIDMain (self):
+    
+        p = multiprocessing.Process(target=self.readCard)
+        p.start()
+        p.join(5)
+
+        if p.is_alive() :
+            p.terminate()
+            p.join
+            print("NO IDS DETECTED")
+            MotionDetectionMain()
+        else :
+            bird_cell.activate()
+            p.join
+
+    def readCard (self): 
+
+        reader = self.reader
+        
+        print('Place Card on Reader')
+        self.id,text = reader.read()
+
+        print('ID: ', self.id)
+
+class servo() : 
+
+    def __init__(self, pin) :
+        self.pin = pin 
+        self.servo = Servo(self.pin);
+
+    def move_servos() :
+        global start_time 
+
+        start_time = datetime.now().minute
+        servo.detach()
+        
+        for i in range(0,5) :
+            print("i: ", i)
+            
+            print("max")
+            servo.max()
+            time.sleep(5)
+            
+            print("min")
+            servo.min()
+            time.sleep(5)
+        
+        servo.detach()
+
+        feeder_cell.activate()
+
+
+# Servo set up
+servo1 = servo(18)
 
 # Motion sensor set up
 sensor = 27
 GPIO.setup(sensor, GPIO.IN)
 
+# RFID set up 
+rfid1 = rfid() 
+
 # Load cell set up 
-hx = HX711(dout_pin=4, pd_sck_pin=17)
-hx.zero()
 ratio = 111 # kinda correct ratio is -95.4
-hx.set_scale_ratio(ratio)
+bird_cell = load_cell(4,17,ratio,"ALALA_BIRD_DATA")
+feeder_cell = load_cell(0,0,ratio,"ALALA_FEEDER_DATA")
 
 # initialize the date 
 start_time = datetime.now().minute
@@ -36,16 +154,11 @@ start_time = datetime.now().minute
 print("start_time: ", start_time)
 
 # prepare the saving of the data
-csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
-data_path = "/home/alalajssf123/Desktop/RunningJSSFPrograms/ALALA_FEEDER_DATA.csv.gz"
 remote_path = "GoogleDrive:ALALA_DATA"
-csv_df_len = len(csv_df)
-print(csv_df_len)
+df_bird_cell_len = len(bird_cell.csv_df)
+print(df_bird_cell_len)
 
 index = 0
-id = 0
-
 
 print("Time: ",datetime.strftime(datetime.now(),"%H"))
 
@@ -73,9 +186,11 @@ def MotionDetectionMain() :
 #          print("type of gogal time: ", type(goal_time))
 #                 
 #              print("time: ", datetime.now().day - start_time)
-#          if datetime.now().day - start_time == 1 and int(datetime.strftime(datetime.now(),"%H")) <= 4:
-#              print("time: ", datetime.now().day - start_time)
-#              move_servos()
+         if datetime.now().day - start_time == 1 and int(datetime.strftime(datetime.now(),"%H")) <= 4:
+             print("time: ", datetime.now().day - start_time)
+             servo1.move_servos()
+             bird_cell.change_files()
+             feeder_cell.change_files()
              
 #          if datetime.now().minute == start_time+1 :
 #              print("time: ", datetime.now().hour - start_time)
@@ -86,98 +201,24 @@ def MotionDetectionMain() :
          if GPIO.input(27):
              print("Motion Detected")
 #              getIDMain()
-             loadsensorMain()
+             rfid1.getIDMain()
          else:
              print("No motion")
 
-             
-
-def loadsensorMain() :
-    
-    print(hx)
-    hx.set_scale_ratio(ratio)
-    
-    prevWeight = 0
-    weight = 0
-    
-#     Input = input("enter key")
-#     time.sleep(1)
-    
-    for i in range (4) :
-        prevWeight = weight
-        weight += hx.get_weight_mean()
-        
-        append(datetime.now(),id, weight-prevWeight, "N/A")
-        
-        print(weight-prevWeight,'grams')
-            
-    averageWeight = weight/4
-    
-    print("Average Weight: ", averageWeight)
-    
-    append(datetime.now(),id, "N/A", averageWeight)
-    save()
-    MotionDetectionMain()
-    
-def getIDMain ():
-    
-    p = multiprocessing.Process(target=readCard)
-    p.start()
-    p.join(5)
-
-    if p.is_alive() :
-        p.terminate()
-        p.join
-        print("NO IDS DETECTED")
-        MotionDetectionMain()
-    else :
-        loadsensorMain()
-        p.join
-
-def readCard (): 
-    
-    print('Place Card on Reader')
-    id,text = reader.read()
-        
-    print('ID: ', id)
-    
-def move_servos() :
-    start_time = datetime.now().minute
-    servo.detach()
-    
-    for i in range(0,5) :
-        print("i: ", i)
-        
-        print("max")
-        servo.max()
-        time.sleep(5)
-        
-        print("min")
-        servo.min()
-        time.sleep(5)
-        
-    servo.detach()
         
     
-def save() :
-    global csv_df_len
-    global csv_df
+def save(df) :
     
-    csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
-    print(csv_df_len)
+    df.convert_to_csv()
+    print(df_bird_cell_len)
     
-    if len(csv_df) >= csv_df_len+20 :
-        csv_df_len = len(result)
+    if len(df.csv_df) >= df_bird_cell_len+20 :
+        df_bird_cell_len = len(df.csv_df)
         health_df = pd.DataFrame(get_pi_health())
         health_df.to_csv('RASP_HEALTH_DATA.csv.gz', mode='a', compression='gzip')
         rclone.copy("/home/alalajssf123/Desktop/RunningJSSFPrograms/RASP_HEALTH_DATA.csv.gz", remote_path)
     
-    rclone.copy(data_path, remote_path)
-    
-#     csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-
-
-    
+    rclone.copy(df.data_path, remote_path)
     
 def get_pi_health():
     temp = os.popen("vcgencmd measure_temp").readline()
@@ -192,9 +233,9 @@ def get_pi_health():
     
     return data
 
-def append(date, idValue, weightValue, avgValue) :
+def append(df,date, idValue, weightValue, avgValue) :
     
-    csv_df.loc[len(csv_df)] = {"Date": date, "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
+    df.loc[len(df)] = {"Date": date, "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
