@@ -1,161 +1,200 @@
 import RPi.GPIO as GPIO
-import time
-import requests
+# import time
+# import requests
 from hx711 import HX711                # import the class HX711
 from mfrc522 import SimpleMFRC522
 import multiprocessing
-import datetime
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import time
+from gpiozero import Servo
+from rclone_python import rclone
+import os 
 
-# setting the GPIO mode
+# Servo set up
+servo = Servo(18)
+
+# RFID set up
 GPIO.setmode(GPIO.BCM)                 # set GPIO pin mode to BCM numbering
-
-# gets the reader for the RFID
 reader = SimpleMFRC522()
 
-# this sets up the Motion Sensor 
-sensor = 27 # GPIO pin # the sensor data is put in       
-GPIO.setup(sensor, GPIO.IN) # setting the GPIO to get information from the sensor
+# Motion sensor set up
+sensor = 27
+GPIO.setup(sensor, GPIO.IN)
 
-# sets up the load cell 
-hx = HX711(dout_pin=4, pd_sck_pin=17) # get and set the GPIO pins that'll receive and give out info 
-hx.zero() # zero out the scale 
-ratio = 105.53  
-hx.set_scale_ratio(ratio) # set the scale's ratio
+# Load cell set up 
+hx = HX711(dout_pin=4, pd_sck_pin=17)
+hx.zero()
+ratio = 111 # kinda correct ratio is -95.4
+hx.set_scale_ratio(ratio)
 
-# init_time = datetime.datetime.now()
-# start_time = int(init_time.strftime("%S"))
-# goal_time = start_time + 5
-# print("goal time: ", goal_time)
+# initialize the date 
+start_time = datetime.now().minute
+# start_time = datetime.now().day
 
-# creates the Pandas Dataframe that'll store the id, weight, and average weight
-csv_df = pd.DataFrame(columns=['id', 'Weight', 'Average Weight'])
+print("start_time: ", start_time)
 
-# index = 0
+# prepare the saving of the data
+csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
+csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
+data_path = "/home/alalajssf123/Desktop/RunningJSSFPrograms/ALALA_FEEDER_DATA.csv.gz"
+remote_path = "GoogleDrive:ALALA_DATA"
+csv_df_len = len(csv_df)
+print(csv_df_len)
+
+index = 0
 id = 0
 
-class motionDetector() :
 
-  def __init__(pin) : 
-    self.pin = pin 
-    GPIO.setup(self.pin, GPIO.IN) # setting the GPIO to get information from the sensor
+print("Time: ",datetime.strftime(datetime.now(),"%H"))
 
-  def detection() : 
+# set the servo to starting position
+servo.detach()
+servo.min()
+time.sleep(3)
+    
+def MotionDetectionMain() :
+    servo.value = None
+    
     while True:
-        # checks if there has been any movement by the motion sensor
-        if GPIO.input(self.pin) :
-            print("Motion Detected")
-            return 
-        else:
-            print("No motion")
-
-class loadSensor() : 
-
-    def __init__(dout, sdk) :
-        self.dout = dout
-        self.sdk = sdk 
-
-        self.hx = HX711(dout_pin=self.dout, pd_sck_pin=self.sdk) # get and set the GPIO pins that'll receive and give out info 
-        self.hx.zero() # zero out the scale 
-        ratio = 105.53  
-        self.hx.set_scale_ratio(ratio) # set the scale's ratio
-
-    def measure(self) : 
-        dout = self.dout
-        sdk = self.sdk 
-        hx  = self.hx
-
-        prevWeight = 0
-        weight = 0
         
-        Input = input("enter key")
-    #     time.sleep(1)
+         time.sleep(0.2)
+        
+        
+#          servo.value = 0
     
-        # displays the current weight while calculating the average weight of a sample of 4
-        for i in range (4) :
-            prevWeight = weight
-            weight += hx.get_weight_mean()
-            
-            append(id, weight-prevWeight, "N/A") # saves these values into the dataframe
-            
-            print(weight-prevWeight,'grams')
+        
+        #init_time = datetime.datetime.now()
+#          
+#          print("init time: ",init_time,"\n")
+#          print("seconds: ", int(init_time.strftime("%S")))
+#          print("goal time: ", goal_time)
+#          print("type of gogal time: ", type(goal_time))
+#                 
+#              print("time: ", datetime.now().day - start_time)
+#          if datetime.now().day - start_time == 1 and int(datetime.strftime(datetime.now(),"%H")) <= 4:
+#              print("time: ", datetime.now().day - start_time)
+#              move_servos()
+             
+#          if datetime.now().minute == start_time+1 :
+#              print("time: ", datetime.now().hour - start_time)
+#              move_servos()
+
+
                 
-        averageWeight = weight/4
+         if GPIO.input(27):
+             print("Motion Detected")
+#              getIDMain()
+             loadsensorMain()
+         else:
+             print("No motion")
+
+             
+
+def loadsensorMain() :
+    
+    print(hx)
+    hx.set_scale_ratio(ratio)
+    
+    prevWeight = 0
+    weight = 0
+    
+#     Input = input("enter key")
+#     time.sleep(1)
+    
+    for i in range (4) :
+        prevWeight = weight
+        weight += hx.get_weight_mean()
         
-        print("Average Weight: ", averageWeight) # print out the average weight
+        append(datetime.now(),id, weight-prevWeight, "N/A")
         
-        append(id, "N/A", averageWeight) # save the average weight to the dataframe
+        print(weight-prevWeight,'grams')
+            
+    averageWeight = weight/4
+    
+    print("Average Weight: ", averageWeight)
+    
+    append(datetime.now(),id, "N/A", averageWeight)
+    save()
+    MotionDetectionMain()
+    
+def getIDMain ():
+    
+    p = multiprocessing.Process(target=readCard)
+    p.start()
+    p.join(5)
+
+    if p.is_alive() :
+        p.terminate()
+        p.join
+        print("NO IDS DETECTED")
+        MotionDetectionMain()
+    else :
+        loadsensorMain()
+        p.join
+
+def readCard (): 
+    
+    print('Place Card on Reader')
+    id,text = reader.read()
         
-        csv_df.to_csv('ALALA_FEEDER_DATA.csv') # save the data collected into a csv file 
-         # return to the main looping function
-class rFID() : 
+    print('ID: ', id)
+    
+def move_servos() :
+    start_time = datetime.now().minute
+    servo.detach()
+    
+    for i in range(0,5) :
+        print("i: ", i)
+        
+        print("max")
+        servo.max()
+        time.sleep(5)
+        
+        print("min")
+        servo.min()
+        time.sleep(5)
+        
+    servo.detach()
+        
+    
+def save() :
+    global csv_df_len
+    global csv_df
+    
+    csv_df.to_csv('ALALA_FEEDER_DATA.csv.gz', compression='gzip')
+    print(csv_df_len)
+    
+    if len(csv_df) >= csv_df_len+20 :
+        csv_df_len = len(result)
+        health_df = pd.DataFrame(get_pi_health())
+        health_df.to_csv('RASP_HEALTH_DATA.csv.gz', mode='a', compression='gzip')
+        rclone.copy("/home/alalajssf123/Desktop/RunningJSSFPrograms/RASP_HEALTH_DATA.csv.gz", remote_path)
+    
+    rclone.copy(data_path, remote_path)
+    
+#     csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
 
-     def __init__():
-         self.reader = SimpleMFRC522() 
-
-     def search():
-          p = multiprocessing.Process(target=self.readCard)
-          p.start()
-          p.join(5) # sets the 5 second timer for the function
-      
-          # if it is still running after 5 seconds it terminates and goes back to looking for motion
-          if p.is_alive() :
-              p.terminate()
-              p.join
-              print("NO IDS DETECTED")
-              return False
-          else : # if not, then it will check weight
-              p.join
-              return True
-
-     def readCard(self):
-          print('Place Card on Reader')
-          id,text = self.reader.read()
-              
-          print('ID: ', id)
-      
-
-class servos():
-
-     def __init__(pin, angle) :
-          self.pin = pin
-          self.angle = angle 
-
-     def move(self) : 
-          pin = self.pin
-          angle = self.angle
-       
-          GPIO.cleanup()
-          GPIO.setmode(GPIO.BOARD)
-          GPIO.setup(pin, GPIO.OUT)
-          
-          pwm1 = GPIO.PWM(pin, 50)
-          
-          pwm1.start(2.1)
-      
-          duty1 = angle / 18 + 2
-          print(duty1)
-              
-          pwm1.ChangeDutyCycle(duty1)
-
-mD = motionDetector(27)
-RFID = rFID()
-ls = loadSensor(4,17)
-
-
-mD.detection()
-if RFID.search() : 
-  ls.measure()
-  mD.detection()
-else : 
-  mD.detection()
 
     
-def append(idValue, weightValue, avgValue) :
     
-    csv_df.loc[len(csv_df)] = {"id":idValue, "Weight":weightValue, "Average Weight": avgValue}
+def get_pi_health():
+    temp = os.popen("vcgencmd measure_temp").readline()
+    voltage = os.popen("vcgencmd measure_volts").readline()
+    throttled = os.popen("vcgencmd get_throttled").readline()
+    
+    data = {
+        "Temperature: " : [temp.replace("temp=","").strip()],
+        "Voltage: " : [voltage.replace("volt=","")],
+        "Throttled: " : [throttled.replace("throttled=","")]
+    }
+    
+    return data
+
+def append(date, idValue, weightValue, avgValue) :
+    
+    csv_df.loc[len(csv_df)] = {"Date": date, "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
