@@ -25,7 +25,7 @@ class load_cell() :
 
         self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
         self.csv_df.to_csv(f'{file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz', compression='gzip')
-        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz"
+        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz"
 
     def activate(self) : 
         GPIO.output(self.dout,GPIO.HIGH)
