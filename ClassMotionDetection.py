@@ -44,7 +44,7 @@ class load_cell() :
             prevWeight = weight
             weight += hx.get_weight_mean()
             
-            append(datetime.now(),rfid1.id, weight-prevWeight, "N/A")
+            append(self.csv_df,datetime.now(),rfid1.id, weight-prevWeight, "N/A")
             
             print(weight-prevWeight,'grams')
                 
@@ -188,7 +188,7 @@ def MotionDetectionMain() :
              print("time: ", datetime.now().day - start_time)
              servo1.move_servos()
              feeder_cell.activate()
-             
+
              bird_cell.change_files()
              feeder_cell.change_files()
              
