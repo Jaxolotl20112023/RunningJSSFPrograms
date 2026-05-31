@@ -129,8 +129,6 @@ class servo() :
         
         servo.detach()
 
-        feeder_cell.activate()
-
 
 # Servo set up
 servo1 = servo(18)
@@ -189,6 +187,8 @@ def MotionDetectionMain() :
          if datetime.now().day - start_time == 1 and int(datetime.strftime(datetime.now(),"%H")) <= 4:
              print("time: ", datetime.now().day - start_time)
              servo1.move_servos()
+             feeder_cell.activate()
+             
              bird_cell.change_files()
              feeder_cell.change_files()
              
