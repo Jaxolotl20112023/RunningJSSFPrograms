@@ -24,8 +24,8 @@ class load_cell() :
         self.hx.set_scale_ratio(ratio) 
 
         self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-        self.csv_df.to_csv(f'{file_name}_{datetime.now().day}.csv.gz', compression='gzip')
-        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().day}.csv.gz"
+        self.csv_df.to_csv(f'{file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz', compression='gzip')
+        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz"
 
     def activate(self) : 
         GPIO.output(self.dout,GPIO.HIGH)
@@ -66,11 +66,11 @@ class load_cell() :
         os.remove(self.data_path)
 
         self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().day}.csv.gz', compression='gzip')
-        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{self.file_name}_{datetime.now().day}.csv.gz"
+        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz', compression='gzip')
+        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{self.file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz"
 
     def convert_to_csv(self) : 
-        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().day}.csv.gz', compression='gzip')
+        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().month}/{datetime.now().day}/{datetime.now().year}.csv.gz', compression='gzip')
         
         
 class rfid() : 
