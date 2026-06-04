@@ -44,7 +44,7 @@ class load_cell() :
             prevWeight = weight
             weight += hx.get_weight_mean()
             
-            append(self.csv_df,datetime.now(),rfid1.id, weight-prevWeight, "N/A")
+            append(self.csv_df,rfid1.id, weight-prevWeight, "N/A")
             
             print(weight-prevWeight,'grams')
                 
@@ -52,7 +52,7 @@ class load_cell() :
         
         print("Average Weight: ", averageWeight)
 
-        append(self.csv_df,datetime.now(),rfid1.id, "N/A", averageWeight)
+        append(self.csv_df,rfid1.id, "N/A", averageWeight)
         save()
         MotionDetectionMain()
 
@@ -233,9 +233,9 @@ def get_pi_health():
     
     return data
 
-def append(df,date, idValue, weightValue, avgValue) :
+def append(df, idValue, weightValue, avgValue) :
     
-    df.loc[len(df)] = {"Date": date, "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
+    df.loc[len(df)] = {"Date": f"{datetime.now().year}-{datetime.now().month}-{datetime.now().day}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
