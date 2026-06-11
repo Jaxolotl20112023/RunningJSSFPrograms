@@ -235,7 +235,7 @@ def get_pi_health():
 
 def append(df, idValue, weightValue, avgValue) :
     
-    df.loc[len(df)] = {"Date": f"{datetime.now().year}-{datetime.now().month}-{datetime.now().day}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
+    df.loc[len(df)] = {"Date": f"{datetime.now().year}-{datetime.now().month}-{datetime.now().day} | {datetime.now().hour}-{datetime.now().minute}-{datetime.now().second}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
