@@ -12,7 +12,8 @@ from gpiozero import Servo
 from rclone_python import rclone
 import os
 from picamera2 import Picamera2
-from picamera2.encoders import H264Encoder
+from picamera2.encoders import H264Encoder,Quality
+from picamera2.outputs import FileOutput
 from picamera2.outputs import FfmpegOutput
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 
@@ -23,19 +24,19 @@ class Camera() :
     
     def __init__(self) :
         self.picam = Picamera2()
-        self.encoder = H264Encoder()
         self.video = None
-        self.config = self.picam.create_video_configuration(main = {"size": (1280,720),
-                                                                    "format": "YUV420"})
-        
+        self.config = self.picam.create_video_configuration()
         self.picam.configure(self.config)
-        self.picam.start()
+
+        self.encoder = H264Encoder(bitrate=10000000)
         
         self.record_num = 0
+        self.output = None
+        self.name = None
+        
         self.capture_start = None
-        self.start = None
         self.capture_end = None
-        self.name = "\0"
+        self.start = None
         self.is_recording = False
         
     def start_preview(self):
@@ -47,7 +48,9 @@ class Camera() :
         
     def start_record(self) :
         self.capture_start = None
-        self.picam.start_recording(H264Encoder(), output=FfmpegOutput("-f rtp udp://192.168.168.110:9000"))
+        self.name = "vid",record_num,".h264"
+        self.output = FileOutput(self.name)
+        self.picam.start_recording(encoder, output, quality=Quality.HIGH)
         self.start = (datetime.now().hour*60*60) + (datetime.now().minute*60)
         self.is_recording = True
         
