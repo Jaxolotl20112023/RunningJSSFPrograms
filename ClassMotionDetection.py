@@ -151,7 +151,9 @@ class rfid() :
             if cam1.capture_start != None:
                 cam1.end_record()
                 ffmpeg_extract_subclip(f"{cam1.name}.mp4", cam1.capture_start, cam1.capture_end, outputfile=f"{cam1.name}f")
-                
+                cam1.capture_start = None 
+                cam1.capture_end = None
+
             MotionDetectionMain()
         else :
                 
@@ -249,7 +251,6 @@ def MotionDetectionMain() :
          
          if not cam1.is_recording :
             cam1.start_record()
-        
              
         
          time.sleep(0.2)
