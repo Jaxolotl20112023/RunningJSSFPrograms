@@ -11,9 +11,9 @@ import time
 from gpiozero import Servo
 from rclone_python import rclone
 import os
+import threading
 from picamera2 import Picamera2
-from picamera2.encoders import H264Encoder,Quality
-from picamera2.outputs import FileOutput
+from picamera2.encoders import H264Encoder
 from picamera2.outputs import FfmpegOutput
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 
@@ -24,19 +24,19 @@ class Camera() :
     
     def __init__(self) :
         self.picam = Picamera2()
+        self.encoder = H264Encoder()
         self.video = None
-        self.config = self.picam.create_video_configuration()
-        self.picam.configure(self.config)
-
-        self.encoder = H264Encoder(bitrate=10000000)
+#         self.config = self.picam.create_video_configuration(main = {"size": (1280,720),
+#                                                                     "format": "YUV420"})
+        
+#         self.picam.configure(self.config)
+#         self.picam.start()
         
         self.record_num = 0
-        self.output = None
-        self.name = None
-        
-        self.capture_start = None
-        self.capture_end = None
+        self.capture_start = False
         self.start = None
+        self.capture_end = False
+        self.name = "\0"
         self.is_recording = False
         
     def start_preview(self):
@@ -46,27 +46,42 @@ class Camera() :
         self.picam.stop_preview()
         self.picam.close()
         
-    def start_record(self) :
-        self.capture_start = None
-        self.name = "vid",record_num,".h264"
-        self.output = FileOutput(self.name)
-        self.picam.start_recording(encoder, output, quality=Quality.HIGH)
-        self.start = (datetime.now().hour*60*60) + (datetime.now().minute*60)
-        self.is_recording = True
+#     def start_record(self) :
+#         self.capture_start = None
+#         self.picam.start_recording(H264Encoder(), output=FfmpegOutput("-f rtp udp://192.168.168.110:9000"))
+#         self.start = (datetime.now().hour*60*60) + (datetime.now().minute*60)
+#         self.is_recording = True
+#         
+#     def end_record(self) :
+#         self.capture_end = None
+#         self.picam.stop_recording()
+#         self.record_num+=1
+#         self.is_recording = False
+#         self.set_capture_end()
+
+#     def simple_record(self,duration) :
+#         self.duration = duration
+#         p = multiprocessing.Process(target=self.record)
+#         p.start()
+#         p.join(duration)
+#         
+#         if p.is_alive() :
+#             print("terminating") 
+#             p.terminate()
+#             p.join
+
+    def simple_record(self,duration) :
+        print("start recording") 
+        self.record_num += 1
+        self.name = f"{self.record_num}.mp4" 
+        self.picam.start_and_record_video(self.name, duration=duration)
         
-    def end_record(self) :
-        self.capture_end = None
-        self.picam.stop_recording()
-        self.record_num+=1
-        self.is_recording = False
-        self.set_capture_end()
-        
-    def set_capture_start(self):
-        self.capture_start = (datetime.now().hour*60*60) + (datetime.now().minute*60 - 60) - self.start
-        
-    def set_capture_end(self):
-        self.capture_end = (datetime.now().hour*60*60) + (datetime.now().minute*60) - self.capture_start
-        
+#     def set_capture_start(self):
+#         self.capture_start = (datetime.now().hour*60*60) + (datetime.now().minute*60 - 60) - self.start
+#         
+#     def set_capture_end(self):
+#         self.capture_end = (datetime.now().hour*60*60) + (datetime.now().minute*60) - self.capture_start
+#         
 class load_cell() : 
 
     def __init__(self,dout,sck,ratio,file_name) : 
@@ -110,8 +125,7 @@ class load_cell() :
 
         append(self.csv_df,rfid1.id, "N/A", averageWeight)
         save(self)
-        #MotionDetectionMain()
-        rfid1.getIDMain()
+        return 
         
     def deactivate(self) : 
         GPIO.output(self.dout,GPIO.LOW)
@@ -147,21 +161,12 @@ class rfid() :
             p.terminate()
             p.join
             print("NO IDS DETECTED")
-             
-            if cam1.capture_start != None:
-                cam1.end_record()
-                ffmpeg_extract_subclip(f"{cam1.name}.mp4", cam1.capture_start, cam1.capture_end, outputfile=f"{cam1.name}f")
-                cam1.capture_start = None 
-                cam1.capture_end = None
-
+                
             MotionDetectionMain()
         else :
-                
-            if cam1.capture_start == None:
-                cam1.set_capture_start()
-            
-            bird_cell.activate()
             p.join
+            
+        return 
 
     def readCard (self): 
 
@@ -225,6 +230,10 @@ bird_cell = load_cell(4,17,ratio,"ALALA_BIRD_DATA")
 
 # initialize the date 
 # start_time = datetime.now().minute
+duration = 5
+recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
+
+
 start_time = datetime.now().day
 
 print("start_time: ", start_time)
@@ -244,14 +253,10 @@ print("Time: ",datetime.strftime(datetime.now(),"%H"))
 # time.sleep(3)
     
 def MotionDetectionMain() :
+    global recording_thread
     servo1.reset_servo()
     
     while True:
-        
-         
-         if not cam1.is_recording :
-            cam1.start_record()
-             
         
          time.sleep(0.2)
         
@@ -272,7 +277,7 @@ def MotionDetectionMain() :
              servo1.move_servos()
 #              feeder_cell.activate()
 
-             bird_cell.change_files()
+#              bird_cell.change_files()
 #              feeder_cell.change_files()
              
 #          if datetime.now().minute == start_time+1 :
@@ -282,8 +287,17 @@ def MotionDetectionMain() :
 
                 
          if GPIO.input(27):
+             
+             
              print("Motion Detected")
+             
+             recording_thread.start()
              rfid1.getIDMain()
+             bird_cell.activate()
+             
+             recording_thread.join()
+             print("join thread") 
+             recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
              #bird_cell.activate()
 #              rfid1.getIDMain()
          else:
