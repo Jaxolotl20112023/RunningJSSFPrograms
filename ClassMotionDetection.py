@@ -1,36 +1,28 @@
 import RPi.GPIO as GPIO
-# import time
-# import requests
 from hx711 import HX711                # import the class HX711
 from mfrc522 import SimpleMFRC522
-import multiprocessing
+from multiprocessing import Process, Queue
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import time
+import requests
+from time import sleep, perf_counter
 from gpiozero import Servo
 from rclone_python import rclone
 import os
 import threading
 from picamera2 import Picamera2
-from picamera2.encoders import H264Encoder
-from picamera2.outputs import FfmpegOutput
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-
+from picamera2.encoders import Quality
 
 GPIO.setmode(GPIO.BCM)
+MIN_BIRD_WEIGHT = 70 # change to the actual miniumu weight of the alala bird
+WEIGHT_CHANGE_ERR = 30 # the amount of change in weight that the program deems valid
 
 class Camera() :
     
     def __init__(self) :
         self.picam = Picamera2()
-        self.encoder = H264Encoder()
         self.video = None
-#         self.config = self.picam.create_video_configuration(main = {"size": (1280,720),
-#                                                                     "format": "YUV420"})
-        
-#         self.picam.configure(self.config)
-#         self.picam.start()
         
         self.record_num = 0
         self.capture_start = False
@@ -45,43 +37,50 @@ class Camera() :
     def end_preview(self):
         self.picam.stop_preview()
         self.picam.close()
-        
-#     def start_record(self) :
-#         self.capture_start = None
-#         self.picam.start_recording(H264Encoder(), output=FfmpegOutput("-f rtp udp://192.168.168.110:9000"))
-#         self.start = (datetime.now().hour*60*60) + (datetime.now().minute*60)
-#         self.is_recording = True
-#         
-#     def end_record(self) :
-#         self.capture_end = None
-#         self.picam.stop_recording()
-#         self.record_num+=1
-#         self.is_recording = False
-#         self.set_capture_end()
-
-#     def simple_record(self,duration) :
-#         self.duration = duration
-#         p = multiprocessing.Process(target=self.record)
-#         p.start()
-#         p.join(duration)
-#         
-#         if p.is_alive() :
-#             print("terminating") 
-#             p.terminate()
-#             p.join
 
     def simple_record(self,duration) :
         print("start recording") 
         self.record_num += 1
-        self.name = f"{self.record_num}.mp4" 
-        self.picam.start_and_record_video(self.name, duration=duration)
+        self.name = f"./videos/{self.record_num}.mp4" 
+        self.picam.start_and_record_video(self.name, duration=duration, quality=Quality.MEDIUM)
+
+class storage() :
+    
+    def __init__(self,name,path) :
+        self.name = name
+        self.path = path
+        self.dfData = []
+        self.currData = {
+            "id" : 0,
+            "weights" : [],
+            "avgWeight" : 0.0
+        }
+        self.file_name = f"./{self.path}/{self.name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.json"
+    
+    def append(self,attr,data) :
+        self.currData[attr] = data
+        print(f"appended {data} at {attr}")
+        print(self.currData) 
         
-#     def set_capture_start(self):
-#         self.capture_start = (datetime.now().hour*60*60) + (datetime.now().minute*60 - 60) - self.start
-#         
-#     def set_capture_end(self):
-#         self.capture_end = (datetime.now().hour*60*60) + (datetime.now().minute*60) - self.capture_start
-#         
+    def save(self) :
+        self.dfData.append(self.currData)
+        self.currData = {
+            "id" : 0,
+            "weights" : [],
+            "avgWeight" : 0.0
+        }
+        
+    def fileSave(self) :
+        print(f"{self.name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.json")
+        pd.DataFrame(self.dfData).to_json(self.file_name, orient="records")
+        self.file_name = f"./{self.path}/{self.name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.json"
+        
+    def getData(self) :
+        return self.dfData
+    
+    def getFilePath(self) :
+        return self.file_name
+    
 class load_cell() : 
 
     def __init__(self,dout,sck,ratio,file_name) : 
@@ -93,56 +92,51 @@ class load_cell() :
         self.hx.zero() 
         self.hx.set_scale_ratio(ratio) 
 
-        self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-        self.csv_df.to_csv(f'{file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz', compression='gzip')
-        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz"
-        self.df_csv_len = len(self.csv_df)
-
     def activate(self) : 
-#         GPIO.output(self.dout,GPIO.HIGH)
-#         GPIO.output(self.sck, GPIO.HIGH) 
-#         GPIO.cleanup()
 
         hx = self.hx
         file_name = self.file_name
-
-        print(hx)
         
         prevWeight = 0
+        totalWeight = 0
         weight = 0
         
-        for i in range (4) :
+        numInvalidWeights = 0 
+        i = 0
+        maxReadings = 4
+        
+        while i < maxReadings :
             prevWeight = weight
-            weight += hx.get_weight_mean()
+            weight = hx.get_weight_mean()
             
-            append(self.csv_df,rfid1.id, weight-prevWeight, "N/A")
-            
-            print(weight-prevWeight,'grams')
+            if weight <= MIN_BIRD_WEIGHT or (weight > MIN_BIRD_WEIGHT and weight-prevWeight > WEIGHT_CHANGE_ERR and prevWeight != 0):
+                print("invalid weight: ", weight)
+                numInvalidWeights+=1
                 
-        averageWeight = weight/4
+                if numInvalidWeights > 10 :
+                    print("TOO MANY INVALID WEIGHTS... SKIPPING...")
+                    return
+                
+                continue
+            
+            numInvalidWeights = 0 
+            totalWeight += weight
+            
+            birdStorer.currData["weights"].append(weight) 
+            
+            print(weight,'grams')
+            i+=1
+                
+        averageWeight = totalWeight/maxReadings
         
         print("Average Weight: ", averageWeight)
+        birdStorer.append("avgWeight", averageWeight) 
 
-        append(self.csv_df,rfid1.id, "N/A", averageWeight)
-        save(self)
-        return 
         
     def deactivate(self) : 
         GPIO.output(self.dout,GPIO.LOW)
         GPIO.output(self.sck, GPIO.LOW) 
         GPIO.cleanup()
-
-    def change_files(self) : 
-
-        os.remove(self.data_path)
-
-        self.csv_df = pd.DataFrame(columns=['Date', 'id', 'Weight', 'Average Weight'])
-        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz', compression='gzip')
-        self.data_path = f"/home/alalajssf123/Desktop/RunningJSSFPrograms/{self.file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz"
-
-    def convert_to_csv(self) : 
-        self.csv_df.to_csv(f'{self.file_name}_{datetime.now().month}-{datetime.now().day}-{datetime.now().year}.csv.gz', compression='gzip')
-        
         
 class rfid() : 
 
@@ -152,30 +146,38 @@ class rfid() :
         self.id = None
 
     def getIDMain (self):
-    
-        p = multiprocessing.Process(target=self.readCard)
+        q = Queue()
+        p = Process(target=self.readCard, args=(q,))
         p.start()
-        p.join(5)
+        
+        p.join(timeout=5)
 
         if p.is_alive() :
             p.terminate()
-            p.join
             print("NO IDS DETECTED")
                 
-            MotionDetectionMain()
+            return False 
         else :
-            p.join
+            self.id = q.get()
+            birdStorer.append("id", self.id)
+            p.terminate()
             
-        return 
+            return True
 
-    def readCard (self): 
+    def readCard (self,q): 
 
         reader = self.reader
         
         print('Place Card on Reader')
-        self.id,text = reader.read()
-
-        print('ID: ', self.id)
+        
+        try :
+            birdId,text = reader.read()
+        except:
+            print("id reading error")
+            self.readCard()
+        
+        q.put(birdId)
+            
 
 class servo() : 
 
@@ -185,7 +187,7 @@ class servo() :
         
         self.servo.detach()
         self.servo.min()
-        time.sleep(3)
+        sleep(3)
         
     def move_servos(self) :
         global start_time
@@ -199,11 +201,11 @@ class servo() :
             
             print("max")
             servo.max()
-            time.sleep(5)
+            sleep(5)
             
             print("min")
             servo.min()
-            time.sleep(5)
+            sleep(5)
         
         servo.detach()
     
@@ -228,20 +230,19 @@ ratio = 111 # kinda correct ratio is -95.4
 bird_cell = load_cell(4,17,ratio,"ALALA_BIRD_DATA")
 # feeder_cell = load_cell(0,0,ratio,"ALALA_FEEDER_DATA")
 
+birdStorer = storage("BirdData","birdData")
+feederStorer = storage("FeederData", "feederData")
 # initialize the date 
 # start_time = datetime.now().minute
 duration = 5
 recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
 
-
-start_time = datetime.now().day
+start_time = perf_counter() 
 
 print("start_time: ", start_time)
 
 # prepare the saving of the data
 remote_path = "GoogleDrive:ALALA_DATA/Alala_Bird_Weight"
-df_bird_cell_len = len(bird_cell.csv_df)
-print(df_bird_cell_len)
 
 index = 0
 
@@ -254,90 +255,77 @@ print("Time: ",datetime.strftime(datetime.now(),"%H"))
     
 def MotionDetectionMain() :
     global recording_thread
+    global start_time
     servo1.reset_servo()
     
     while True:
         
-         time.sleep(0.2)
+        sleep(0.2)
         
-        
-#          servo.value = 0
-    
-        
-        #init_time = datetime.datetime.now()
-#          
-#          print("init time: ",init_time,"\n")
-#          print("seconds: ", int(init_time.strftime("%S")))
-#          print("goal time: ", goal_time)
-#          print("type of gogal time: ", type(goal_time))
-#                 
-#              print("time: ", datetime.now().day - start_time)
-         if datetime.now().day - start_time >= 1 and int(datetime.strftime(datetime.now(),"%H")) <= 4:
-             print("time: ", datetime.now().day - start_time)
-             servo1.move_servos()
-#              feeder_cell.activate()
+        if (perf_counter() - start_time)/360 > 19 :
+            start_time = perf_counter()
+            print("SEND DATA TO THE API")
+            r.push('https://jssfEX/addData', data={"data" : birdStorer.getData})
+            
+            if r.status_code == 201 or r.status_code == 200 :
+                os.remove(birdStorer.getFilePath())
 
-#              bird_cell.change_files()
-#              feeder_cell.change_files()
+        if GPIO.input(27):
              
-#          if datetime.now().minute == start_time+1 :
-#              print("time: ", datetime.now().hour - start_time)
-#              move_servos()
+            print("Motion Detected")
+             
+            recording_thread.start()
+             
+            if rfid1.getIDMain() :
+                 
+                bird_cell.activate()
+                 
+                birdStorer.save()
+                birdStorer.fileSave()
+             
+            recording_thread.join()
+            print("join thread") 
+            recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
 
+        else:
+            print("No motion")
 
-                
-         if GPIO.input(27):
-             
-             
-             print("Motion Detected")
-             
-             recording_thread.start()
-             rfid1.getIDMain()
-             bird_cell.activate()
-             
-             recording_thread.join()
-             print("join thread") 
-             recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
-             #bird_cell.activate()
-#              rfid1.getIDMain()
-         else:
-             print("No motion")
+    
 
-        
     
-def save(df) :
+# def save(df) :
+#     
+#     df.convert_to_csv()
+#     print(df.df_csv_len)
+#     
+#     if len(df.csv_df) >= df.df_csv_len+10 :
+#         df.df_csv_len = len(df.csv_df)
+#         health_df = pd.DataFrame(get_pi_health())
+#         health_df.to_csv('RASP_HEALTH_DATA.csv.gz', compression='gzip')
+#         rclone.copy("/home/alalajssf123/Desktop/RunningJSSFPrograms/RASP_HEALTH_DATA.csv.gz", "GoogleDrive:ALALA_DATA/Pi_Health")
+#     
+#     rclone.copy(df.data_path, remote_path)
     
-    df.convert_to_csv()
-    print(df.df_csv_len)
-    
-    if len(df.csv_df) >= df.df_csv_len+10 :
-        df.df_csv_len = len(df.csv_df)
-        health_df = pd.DataFrame(get_pi_health())
-        health_df.to_csv('RASP_HEALTH_DATA.csv.gz', compression='gzip')
-        rclone.copy("/home/alalajssf123/Desktop/RunningJSSFPrograms/RASP_HEALTH_DATA.csv.gz", "GoogleDrive:ALALA_DATA/Pi_Health")
-    
-    rclone.copy(df.data_path, remote_path)
-    
-def get_pi_health():
-    temp = os.popen("vcgencmd measure_temp").readline()
-    voltage = os.popen("vcgencmd measure_volts").readline()
-    throttled = os.popen("vcgencmd get_throttled").readline()
-    
-    temp = temp.replace("temp=","").strip()
-    temp = temp.replace("'C","").strip()
-    voltage = voltage.replace("V","").strip()
-    
-    data = {
-        "Temperature: " : [temp.replace("temp=","").strip()],
-        "Voltage: " : [voltage.replace("volt=","").strip()],
-        "Throttled: " : [throttled.replace("throttled=","").strip()]
-    }
-    
-    return data
+# def get_pi_health():
+#     temp = os.popen("vcgencmd measure_temp").readline()
+#     voltage = os.popen("vcgencmd measure_volts").readline()
+#     throttled = os.popen("vcgencmd get_throttled").readline()
+#     
+#     temp = temp.replace("temp=","").strip()
+#     temp = temp.replace("'C","").strip()
+#     voltage = voltage.replace("V","").strip()
+#     
+#     data = {
+#         "Temperature: " : [temp.replace("temp=","").strip()],
+#         "Voltage: " : [voltage.replace("volt=","").strip()],
+#         "Throttled: " : [throttled.replace("throttled=","").strip()]
+#     }
+#     
+#     return data
 
-def append(df, idValue, weightValue, avgValue) :
-    
-    df.loc[len(df)] = {"Date": f"{datetime.now().month}-{datetime.now().day}-{datetime.now().year}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
+# def append(df, idValue, weightValue, avgValue) :
+#     
+#     df.loc[len(df)] = {"Date": f"{datetime.now().month}-{datetime.now().day}-{datetime.now().year}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
