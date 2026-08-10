@@ -17,6 +17,7 @@ from picamera2.encoders import Quality
 GPIO.setmode(GPIO.BCM)
 MIN_BIRD_WEIGHT = 70 # change to the actual miniumu weight of the alala bird
 WEIGHT_CHANGE_ERR = 30 # the amount of change in weight that the program deems valid
+API_BASE_URL = 'https://192.168.1.28' # this is temporary. need to replace it to the IPv4 address that is associated with the laptop using to run this
 
 class Camera() :
     
@@ -265,7 +266,7 @@ def MotionDetectionMain() :
         if (perf_counter() - start_time)/360 > 19 :
             start_time = perf_counter()
             print("SEND DATA TO THE API")
-            r.push('https://jssfEX/addData', data={"data" : birdStorer.getData})
+            r = requests.post(f'{API_BASE_URL}/pushBirdWeight', json=birdStorer.getData)
             
             if r.status_code == 201 or r.status_code == 200 :
                 os.remove(birdStorer.getFilePath())
