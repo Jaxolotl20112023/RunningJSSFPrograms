@@ -1,6 +1,6 @@
 # RunningJSSFPrograms
 
-There are two programs in here: MotionDetection is the main program where controlling/using the sensors, motors, and other electronics is done. The other file is a calibration file that'll help calibrate the best ratio for the load sensor. 
+The main program file that is being used is the ClassMotionDetection.py. This file is similar to the MotionDetection.py files, but manages each new electronic device as a class. This allows easier integration of new devices and overall makes the code cleaner and easier to read. Another file that will be used is the start_up.py. This file is going to be run before the ClassMotionDetection to set certain properties about the feeder itself like id, location, etc.
 
 Inside the MotionDetection file, it'll first check for motion using the motion detector. Once it detects there is motion, it'll activate the RFID reader for 5 seconds. The reason why we make it run for only 5 seconds is that the RFID takes a good amount of power from the RaspBerryPi4. If it detects an ID, then it'll append the ID to the DataFrame and activate the load sensor. If it does not detect an ID it'll go back to the function that searches for motion. In the load sensor function, it'll get the weight 4 times and average it; if the weight is equal to 0 it'll not count it in the average. It then appends the value to the DataFrame and saves it to a CSV file. Finally, we return to the motion detection function.
 
