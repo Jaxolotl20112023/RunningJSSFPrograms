@@ -13,11 +13,13 @@ import os
 import threading
 from picamera2 import Picamera2
 from picamera2.encoders import Quality
+from Constants import API_BASE_URL
+
 
 GPIO.setmode(GPIO.BCM)
 MIN_BIRD_WEIGHT = 70 # change to the actual miniumu weight of the alala bird
 WEIGHT_CHANGE_ERR = 30 # the amount of change in weight that the program deems valid
-API_BASE_URL = 'https://192.168.1.28' # this is temporary. need to replace it to the IPv4 address that is associated with the laptop using to run this
+ # this is temporary. need to replace it to the IPv4 address that is associated with the laptop using to run this
 
 class Camera() :
     
@@ -233,6 +235,7 @@ bird_cell = load_cell(4,17,ratio,"ALALA_BIRD_DATA")
 
 birdStorer = storage("BirdData","birdData")
 feederStorer = storage("FeederData", "feederData")
+foodStorer = storage("FoodData", "foodData") 
 # initialize the date 
 # start_time = datetime.now().minute
 duration = 5
@@ -257,19 +260,23 @@ print("Time: ",datetime.strftime(datetime.now(),"%H"))
 def MotionDetectionMain() :
     global recording_thread
     global start_time
-    servo1.reset_servo()
+#     servo1.reset_servo()
     
     while True:
         
         sleep(0.2)
         
-        if (perf_counter() - start_time)/360 > 19 :
-            start_time = perf_counter()
-            print("SEND DATA TO THE API")
-            r = requests.post(f'{API_BASE_URL}/pushBirdWeight', json=birdStorer.getData)
-            
-            if r.status_code == 201 or r.status_code == 200 :
-                os.remove(birdStorer.getFilePath())
+        if (perf_counter() - start_time) >= 10: #(perf_counter() - start_time)/360 > 19 :
+            try : 
+                start_time = perf_counter()
+                print("SEND DATA TO THE API")
+                r = requests.post(f'{API_BASE_URL}/pushBirdWeight', json=birdStorer.dfData)
+                
+                if r.status_code == 201 or r.status_code == 200 :
+#                     birdStorer.dfData = [{}]
+                    os.remove(birdStorer.getFilePath())
+            except :
+                print("failed to connect") 
 
         if GPIO.input(27):
              
@@ -290,43 +297,7 @@ def MotionDetectionMain() :
 
         else:
             print("No motion")
-
-    
-
-    
-# def save(df) :
-#     
-#     df.convert_to_csv()
-#     print(df.df_csv_len)
-#     
-#     if len(df.csv_df) >= df.df_csv_len+10 :
-#         df.df_csv_len = len(df.csv_df)
-#         health_df = pd.DataFrame(get_pi_health())
-#         health_df.to_csv('RASP_HEALTH_DATA.csv.gz', compression='gzip')
-#         rclone.copy("/home/alalajssf123/Desktop/RunningJSSFPrograms/RASP_HEALTH_DATA.csv.gz", "GoogleDrive:ALALA_DATA/Pi_Health")
-#     
-#     rclone.copy(df.data_path, remote_path)
-    
-# def get_pi_health():
-#     temp = os.popen("vcgencmd measure_temp").readline()
-#     voltage = os.popen("vcgencmd measure_volts").readline()
-#     throttled = os.popen("vcgencmd get_throttled").readline()
-#     
-#     temp = temp.replace("temp=","").strip()
-#     temp = temp.replace("'C","").strip()
-#     voltage = voltage.replace("V","").strip()
-#     
-#     data = {
-#         "Temperature: " : [temp.replace("temp=","").strip()],
-#         "Voltage: " : [voltage.replace("volt=","").strip()],
-#         "Throttled: " : [throttled.replace("throttled=","").strip()]
-#     }
-#     
-#     return data
-
-# def append(df, idValue, weightValue, avgValue) :
-#     
-#     df.loc[len(df)] = {"Date": f"{datetime.now().month}-{datetime.now().day}-{datetime.now().year}", "id":idValue, "Weight":weightValue, "Average Weight": avgValue}
     
 if __name__ == "__main__":
     MotionDetectionMain()
+
