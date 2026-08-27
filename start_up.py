@@ -1,29 +1,28 @@
 import pandas as pd 
-import uuid 
-
+import uuid
+import requests
+from Constants import API_BASE_URL
 
 def start_up() :
     
-    df = [pd.read_json('feederProps.json', lines="true").to_dict(orient="dict")]
+    feeder_id = None 
     
-    print(df)
     try : 
-        return df[0]["feederID"]
-    except KeyError:
-
-        print("inserting id") 
-        df[0] ={"feederID" : "1234"}
-    #         print(df["feederID"])
-        pd.DataFrame(df,columns=['Info']).to_json("feederProps.json")
-#         return df["values"]["feederID"] 
-#     
-#     return df["feederID"]
+        df = pd.read_json('feederProps.json', lines="true").to_dict()
+        feeder_id = df["Feed-Station-Data"][0]["feederID"]
+    except :
         
-    
-#     with open("./FeederInfo.txt", "r+") as f :
-#         
-#         if f.read() == "" :
-#             f.write(uuid.uuid4().hex)
+        feeder_id = uuid.uuid4()
+        df = {
+            "Feed-Station-Data" : {"feederID" : str(feeder_id)}
+        }
+        
+        pd.DataFrame(df).to_json("feederProps.json")
+        
+    print("Config data properly stored")
+    return feeder_id
+         
     
 if __name__ == "__main__" :
-    print(start_up())
+    start_up()
+
