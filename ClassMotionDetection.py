@@ -17,7 +17,7 @@ from Constants import API_BASE_URL
 
 
 GPIO.setmode(GPIO.BCM)
-MIN_BIRD_WEIGHT = 70 # change to the actual miniumu weight of the alala bird
+MIN_BIRD_WEIGHT = 70 # change to the actual miniumum weight of the alala bird
 WEIGHT_CHANGE_ERR = 30 # the amount of change in weight that the program deems valid
  # this is temporary. need to replace it to the IPv4 address that is associated with the laptop using to run this
 
@@ -215,15 +215,17 @@ class servo() :
     def reset_servo(self) :
         self.servo.value = None
 
-# Servo set up
-servo1 = servo(18)
-
-# Camera set up
-cam1 = Camera()
-
 # Motion sensor set up
 sensor = 27
 GPIO.setup(sensor, GPIO.IN)
+# Servo set up
+servo1 = servo(18)
+
+#Motion Detector
+motionDetector = GPIO.input(sensor)
+
+# Camera set up
+cam1 = Camera()
 
 # RFID set up 
 rfid1 = rfid() 
@@ -236,17 +238,12 @@ bird_cell = load_cell(4,17,ratio,"ALALA_BIRD_DATA")
 birdStorer = storage("BirdData","birdData")
 feederStorer = storage("FeederData", "feederData")
 foodStorer = storage("FoodData", "foodData") 
-# initialize the date 
-# start_time = datetime.now().minute
 duration = 5
 recording_thread = threading.Thread(target=cam1.simple_record, args=(duration,))    
 
 start_time = perf_counter() 
 
 print("start_time: ", start_time)
-
-# prepare the saving of the data
-remote_path = "GoogleDrive:ALALA_DATA/Alala_Bird_Weight"
 
 index = 0
 
@@ -260,7 +257,6 @@ print("Time: ",datetime.strftime(datetime.now(),"%H"))
 def MotionDetectionMain() :
     global recording_thread
     global start_time
-#     servo1.reset_servo()
     
     while True:
         
@@ -273,21 +269,18 @@ def MotionDetectionMain() :
                 r = requests.post(f'{API_BASE_URL}/pushBirdWeight', json=birdStorer.dfData)
                 
                 if r.status_code == 201 or r.status_code == 200 :
-#                     birdStorer.dfData = [{}]
                     os.remove(birdStorer.getFilePath())
             except :
                 print("failed to connect") 
 
-        if GPIO.input(27):
+        if motionDetector:
              
             print("Motion Detected")
              
             recording_thread.start()
              
             if rfid1.getIDMain() :
-                 
                 bird_cell.activate()
-                 
                 birdStorer.save()
                 birdStorer.fileSave()
              
